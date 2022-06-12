@@ -29,12 +29,13 @@ namespace ASC.DataAccess
 
         }
 
-        private async Task<Action> CreateRollBackAction(TableOperation operation)
+        private async Task<Action> CreateRollBackAction(TableOperation operation, bool isAuditOperation = false)
         {
             if (operation.OperationType == TableOperationType.Retrieve) return null;
 
             var tableEntity = operation.Entity;
-            var cloudTable = storageTable;
+            var cloudTable = isAuditOperation ? storageTable : tableClient
+                .GetTableReference($"{typeof(T).Name}Audit");   
 
             switch (operation.OperationType)
             {
@@ -90,6 +91,12 @@ namespace ASC.DataAccess
         {
             CloudTable table = tableClient.GetTableReference(typeof(T).Name);
             await table.CreateIfNotExistsAsync();
+
+            if (typeof(IAuditTracker).IsAssignableFrom(typeof(T)))
+            {
+                var auditTable = tableClient.GetTableReference($"{typeof(T).Name}Audit");
+                await auditTable.CreateIfNotExistsAsync();
+            }
         }
 
         public async Task DeleteAsync(T entity)
@@ -143,6 +150,22 @@ namespace ASC.DataAccess
             var rollbackAction = CreateRollBackAction(operation);
             var result = await storageTable.ExecuteAsync(operation);
             Scope.RollBackActions.Enqueue(rollbackAction);
+            //return result;
+
+           //Audit Implementation
+           if(operation.Entity is IAuditTracker)
+            {
+                var auditEntity = ObjectExtension.CopyObject<T>(operation.Entity);
+                auditEntity.PartitionKey = $"{auditEntity.PartitionKey}-{auditEntity.RowKey}";
+                auditEntity.RowKey = $"{DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fff")}";
+
+                var auditOperation = TableOperation.Insert(auditEntity);
+                var auditRollBackAction = CreateRollBackAction(auditOperation, true);
+
+                var auditTable = tableClient.GetTableReference($"{typeof(T).Name}Audit");
+                await auditTable.ExecuteAsync(auditOperation);
+                Scope.RollBackActions.Enqueue(auditRollBackAction);
+            }
             return result;
         }
     }

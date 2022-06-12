@@ -21,6 +21,10 @@ namespace ASC.Solution.v1._1
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
+
+                }).UseDefaultServiceProvider(options =>
+                {
+                    options.ValidateScopes = false;
                 });
     }
 }

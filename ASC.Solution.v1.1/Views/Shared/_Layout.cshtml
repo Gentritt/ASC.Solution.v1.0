@@ -8,7 +8,7 @@
                 <img class="responsive-img" src="~/images/logo.png.png" alt="Logo" />
             </a>
             <ul class="right hide-on-med-and-down">
-                <li><a href="#">Login</a></li>
+                <li><a href="/Account/Login">Login</a></li>
                 <li><a href="#">Contact</a></li>
             </ul>
             <a href="#" data-activates="nav-mobile" class="button-collapse">
@@ -34,8 +34,7 @@
             </div>
         </div>
         <div class="parallax">
-            <img src="~/images/background1.jpg" alt="Unsplashed background
-img 1">
+            <img src="~/images/background1.jpg" alt="Unsplashed backgroundimg 1">
         </div>
     </div>
 </header>
@@ -89,3 +88,7 @@ img 1">
         </div>
     </div>
 </footer>
+
+@section Scripts{
+@RenderSection("Scripts", required: false)
+}

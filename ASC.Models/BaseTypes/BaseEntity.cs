@@ -10,6 +10,6 @@ namespace ASC.DataAccess
         public DateTime UpdateDate { get; set; }
         public string CreatedBy { get; set; }
         public string UpdateBy { get; set; }
-
+        public string SecurityStamp { get; set; }
     }
 }
