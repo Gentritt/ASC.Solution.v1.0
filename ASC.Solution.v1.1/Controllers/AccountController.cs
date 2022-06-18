@@ -524,7 +524,6 @@ namespace ASC.Web.Controllers
         {
             serviceEngineer.ServiceEngineers = HttpContext.Session.GetSession<List<ApplicationUser>>("ServiceEngineers");
 
-            serviceEngineer.Registration.Email = "gent_se@test.com";
             if (!ModelState.IsValid)
             {
                 return View(serviceEngineer);
@@ -533,11 +532,15 @@ namespace ASC.Web.Controllers
             if (serviceEngineer.Registration.IsEdit)
             {
 
-                var user =await _userManager.FindByEmailAsync(serviceEngineer.Registration.Email);
+                var user = await _userManager.FindByEmailAsync(serviceEngineer.Registration.Email);
 
+                if (user == null)
+                    return View(serviceEngineer);
 
                 var token = await _userManager.GeneratePasswordResetTokenAsync(user);
                 IdentityResult result = await _userManager.ResetPasswordAsync(user, token, serviceEngineer.Registration.Password);
+
+                user.UserName = serviceEngineer.Registration.UserName;
 
                 if (!result.Succeeded)
                 {
@@ -549,17 +552,21 @@ namespace ASC.Web.Controllers
                 //Update Claims
 
                 user = await _userManager.FindByEmailAsync(serviceEngineer.Registration.Email);
+
                 var claims = _userManager.GetClaimsAsync(user).Result;
+
                 var isActiveClaim = claims.SingleOrDefault(x => x.Type == "IsActive");
-
                 
-                var removeClaimResult = await _userManager.RemoveClaimAsync(user, new Claim(isActiveClaim.Type, isActiveClaim.Value));
+                if(isActiveClaim.Value != serviceEngineer.Registration.IsActive.ToString())
+                {
+                    var removeClaimResult = await _userManager.RemoveClaimAsync(user, new Claim(isActiveClaim.Type, isActiveClaim.Value));
 
-                var addClaimResult = await _userManager.AddClaimAsync(user, new Claim(isActiveClaim.Type, serviceEngineer.Registration.IsActive.ToString()));
+                    if(removeClaimResult.Succeeded)
+                         await _userManager.AddClaimAsync(user, new Claim(isActiveClaim.Type, serviceEngineer.Registration.IsActive.ToString()));
 
+                }
 
-
-
+                await _userManager.CreateAsync(user);
             }
 
             else
@@ -598,18 +605,18 @@ namespace ASC.Web.Controllers
                     return View(serviceEngineer);
                 }
 
-                if (serviceEngineer.Registration.IsActive)
-                {
-                    await _emailSender.SendEmailAsync(serviceEngineer.Registration.Email,
-                    "Account Created/Modified",
-                    $"Email : {serviceEngineer.Registration.Email} /n Passowrd : {serviceEngineer.Registration.Password}");
-                }
-                else
-                {
-                    await _emailSender.SendEmailAsync(serviceEngineer.Registration.Email,
-                    "Account Deactivated",
-                    $"Your account has been deactivated.");
-                }
+                //if (serviceEngineer.Registration.IsActive)
+                //{
+                //    await _emailSender.SendEmailAsync(serviceEngineer.Registration.Email,
+                //    "Account Created/Modified",
+                //    $"Email : {serviceEngineer.Registration.Email} /n Passowrd : {serviceEngineer.Registration.Password}");
+                //}
+                //else
+                //{
+                //    await _emailSender.SendEmailAsync(serviceEngineer.Registration.Email,
+                //    "Account Deactivated",
+                //    $"Your account has been deactivated.");
+                //}
 
 
             }
@@ -641,6 +648,44 @@ namespace ASC.Web.Controllers
                 return RedirectToAction(nameof(HomeController.Index), "Home");
             }
         }
+
+
+        [HttpGet]
+        public async Task<IActionResult> Profile()
+        {
+            var user = await _userManager.FindByEmailAsync(HttpContext.User.GetCurrentUserDetails().Email);
+            return View(new ProfileViewModel() { Username = user.UserName, IsEditSuccess = false });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+
+        public async Task<IActionResult> Profile(ProfileViewModel profile)
+        {
+            var user = await _userManager.FindByEmailAsync(HttpContext.User.GetCurrentUserDetails().Email);
+
+            user.UserName = profile.Username;
+            var result = await _userManager.UpdateAsync(user);
+
+            await _signInManager.SignOutAsync();
+            await _signInManager.SignInAsync(user, false);
+
+            profile.IsEditSuccess = result.Succeeded;
+
+            AddErrors(result);
+
+            if(ModelState.ErrorCount > 0)
+            {
+                return View(profile);
+
+            }
+
+            return RedirectToAction("Profile");
+
+        }
+
+
+
 
         #endregion
     } 
